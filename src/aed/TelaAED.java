@@ -236,7 +236,7 @@ public class TelaAED extends javax.swing.JFrame {
 
         return R * c;
     }
-    
+    //gitteste
     private void carregarLugaresIniciais() {
         // Você pode adicionar quantos lugares quiser aqui.
         // Usei coordenadas de exemplo em Brasília, já que o mapa centraliza lá.
