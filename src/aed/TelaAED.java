@@ -331,7 +331,7 @@ public class TelaAED extends javax.swing.JFrame {
         } else {
             tipoEquipeNecessaria = "Logística"; 
         }
-
+           //gitteste02
         // 2. Achar o nó da malha viária mais próximo do clique
         Lugar noMaisProximo = null;
         double menorDistanciaDoCliqueAoNo = Double.MAX_VALUE;
