@@ -14,6 +14,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.*; // Importa Map, List, ArrayList, Set, HashMap, etc.
 
 /**
  *
@@ -24,6 +25,10 @@ public class TelaAED extends javax.swing.JFrame {
     private JMapViewer map;
     private List<Lugar> lugares = new ArrayList<>();
     private List<Rota> rotas = new ArrayList<>();
+    // Adicione logo abaixo de: private List<Rota> rotas...
+    private boolean modoSelecaoDesastre = false; 
+    private String tipoDesastreAtual = "";
+    private Grafo grafoCidade = new Grafo(); // Seu objeto Grafo
     
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(TelaAED.class.getName());
 
@@ -34,8 +39,7 @@ public class TelaAED extends javax.swing.JFrame {
         initComponents();
         map = new JMapViewer();
         map.setZoom(5);
-        map.setDisplayPosition(new Coordinate(-15.7801, -47.9292), 4); // Centraliza no Brasil
-
+        map.setDisplayPosition(new Coordinate(-12.6710, -39.1005), 14); // Zoom 14 para ver as ruas 
         // 2. Adiciona os listeners
         map.addMouseListener(new MouseAdapter() {
             @Override
@@ -44,8 +48,14 @@ public class TelaAED extends javax.swing.JFrame {
                     Point p = e.getPoint();
                     Coordinate coord = (Coordinate) map.getPosition(p);
                     
-                    // Este método será copiado no próximo passo
-                    cadastrarLugar(coord); 
+                    if (modoSelecaoDesastre) {
+                        // Se clicou para marcar desastre
+                        processarDesastre(coord, tipoDesastreAtual);
+                        modoSelecaoDesastre = false; // Reseta o modo
+                    } else {
+                        // Se clicou para cadastrar um lugar novo (comportamento antigo)
+                        cadastrarLugar(coord); 
+                    } 
                 }
             }
             
@@ -87,7 +97,7 @@ public class TelaAED extends javax.swing.JFrame {
         jButton1.setText("Cadastrar Rota");
         jButton1.addActionListener(this::jButton1ActionPerformed);
 
-        jButton2.setText("jButton2");
+        jButton2.setText("Cadastrar Desastre");
         jButton2.addActionListener(this::jButton2ActionPerformed);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -119,7 +129,18 @@ public class TelaAED extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        // TODO add your handling code here:
+        // 1. Pergunta a descrição/tipo do desastre
+        String[] opcoes = {"Incêndio", "Acidente de Trânsito", "Resgate", "Outros"};
+        String escolha = (String) JOptionPane.showInputDialog(
+                this, "Qual o tipo da ocorrência?", "Reportar Desastre",
+                JOptionPane.WARNING_MESSAGE, null, opcoes, opcoes[0]);
+
+        if (escolha != null) {
+            this.tipoDesastreAtual = escolha;
+            this.modoSelecaoDesastre = true; // Ativa o modo de espera pelo clique
+            JOptionPane.showMessageDialog(this, 
+                "Agora CLIQUE no mapa onde ocorreu o desastre (" + escolha + ").");
+        }
     }//GEN-LAST:event_jButton2ActionPerformed
 
     /**
@@ -236,38 +257,151 @@ public class TelaAED extends javax.swing.JFrame {
 
         return R * c;
     }
-    //gitteste
     private void carregarLugaresIniciais() {
-        // Você pode adicionar quantos lugares quiser aqui.
-        // Usei coordenadas de exemplo em Brasília, já que o mapa centraliza lá.
+        // --- COORDENADAS DE CRUZ DAS ALMAS, BA ---
+        
+        // 1. Equipes (Bases)
+        // Local fictício próximo à saída para BR-101
+        Lugar baseBombeiros = new Lugar("Bombeiros (BR-101)", "Bombeiros", new Coordinate(-12.6645, -39.1130));
+        // Próximo ao centro
+        Lugar baseHospital = new Lugar("Hospital (Centro)", "Médicos", new Coordinate(-12.6738, -39.1070)); 
+        
+        // 2. Pontos de Passagem (Malha Viária da cidade)
+        Lugar pracaMatriz = new Lugar("Praça Sen. Temístocles", "Via", new Coordinate(-12.6710, -39.1005));
+        Lugar ufrb = new Lugar("Entrada UFRB", "Via", new Coordinate(-12.6600, -39.0900));
+        Lugar embrapa = new Lugar("Embrapa", "Via", new Coordinate(-12.6780, -39.1200));
+        Lugar rodoviaria = new Lugar("Rodoviária", "Via", new Coordinate(-12.6685, -39.1050));
 
-        // Exemplo 1: Hospital
-        Coordinate c1 = new Coordinate(-15.7997, -47.8938); // Coordenada do Hospital de Base
-        Lugar hospital = new Lugar("Hospital de Base", "Hospital", c1);
-        
-        // Adiciona na lista de lugares (para usar nas rotas)
-        lugares.add(hospital); 
-        // Adiciona o marcador no mapa
-        map.addMapMarker(new MapMarkerDot(hospital.getNome(), hospital.getCoord()));
+        // Adiciona visualmente e logicamente
+        adicionarLugarNoSistema(baseBombeiros);
+        adicionarLugarNoSistema(baseHospital);
+        adicionarLugarNoSistema(pracaMatriz);
+        adicionarLugarNoSistema(ufrb);
+        adicionarLugarNoSistema(embrapa);
+        adicionarLugarNoSistema(rodoviaria);
 
+        // --- CONEXÕES REAIS ---
+        // Agora não passamos o peso manual. O método calculará a distância em KM.
         
-        // Exemplo 2: Ponto Turístico
-        Coordinate c2 = new Coordinate(-15.7996, -47.8645); // Coordenada do Congresso Nacional
-        Lugar congresso = new Lugar("Congresso Nacional", "Ponto Turístico", c2);
+        // Conexões do Hospital
+        criarConexao(baseHospital, pracaMatriz);
+        criarConexao(baseHospital, rodoviaria);
         
-        lugares.add(congresso);
-        map.addMapMarker(new MapMarkerDot(congresso.getNome(), congresso.getCoord()));
+        // Conexões da Rodoviária
+        criarConexao(rodoviaria, baseBombeiros);
+        criarConexao(rodoviaria, pracaMatriz);
+        criarConexao(rodoviaria, embrapa);
+        
+        // Conexões da UFRB
+        criarConexao(ufrb, pracaMatriz);
+        criarConexao(ufrb, baseBombeiros); // Via perimetral fictícia
 
+        logger.info("Mapa de Cruz das Almas carregado.");
+    }
+
+    // --- Métodos Auxiliares para evitar repetição de código ---
+
+    private void adicionarLugarNoSistema(Lugar l) {
+        lugares.add(l); // Lista local
+        map.addMapMarker(new MapMarkerDot(l.getNome(), l.getCoord())); // Visual
+        grafoCidade.adicionarLugar(l); // Grafo Lógico (Dijkstra)
+    }
+
+    private void criarConexao(Lugar origem, Lugar destino) {
+        // Calcula a distância real em KM para usar como PESO da aresta
+        double distanciaReal = calcularDistancia(origem.getCoord(), destino.getCoord());
         
-        // Exemplo 3: Restaurante
-        Coordinate c3 = new Coordinate(-15.8052, -47.8777); // Coordenada de um restaurante
-        Lugar restaurante = new Lugar("Restaurante X", "Restaurante", c3);
-        
-        lugares.add(restaurante);
-        map.addMapMarker(new MapMarkerDot(restaurante.getNome(), restaurante.getCoord()));
-        
-        // Mensagem (opcional)
-        logger.info("Lugares iniciais carregados.");
+        // Conecta no Grafo Lógico
+        grafoCidade.adicionarRota(origem, destino, distanciaReal);
+
+        // Desenha a linha no Mapa Visual
+        List<Coordinate> linha = new ArrayList<>();
+        linha.add(origem.getCoord());
+        linha.add(destino.getCoord());
+        map.addMapPolygon(new MapPolygonImpl(linha));
     }
     
+    private void processarDesastre(Coordinate coordDesastre, String descricao) {
+        // 1. Identificar tipo de equipe
+        String tipoEquipeNecessaria;
+        if (descricao.equals("Incêndio") || descricao.equals("Resgate")) {
+            tipoEquipeNecessaria = "Bombeiros";
+        } else if (descricao.equals("Acidente de Trânsito")) {
+            tipoEquipeNecessaria = "Médicos";
+        } else {
+            tipoEquipeNecessaria = "Logística"; 
+        }
+
+        // 2. Achar o nó da malha viária mais próximo do clique
+        Lugar noMaisProximo = null;
+        double menorDistanciaDoCliqueAoNo = Double.MAX_VALUE;
+
+        for (Lugar l : lugares) {
+            double d = calcularDistancia(coordDesastre, l.getCoord());
+            if (d < menorDistanciaDoCliqueAoNo) {
+                menorDistanciaDoCliqueAoNo = d;
+                noMaisProximo = l;
+            }
+        }
+
+        if (noMaisProximo == null) {
+            JOptionPane.showMessageDialog(this, "Erro: O mapa está vazio.");
+            return;
+        }
+
+        // Adiciona marcador do desastre
+        map.addMapMarker(new MapMarkerDot("DESASTRE: " + descricao, coordDesastre));
+
+        // 3. Executar Dijkstra a partir do nó da rua
+        Map<Lugar, Double> distanciasPeloGrafo = grafoCidade.executarDijkstra(noMaisProximo);
+
+        // 4. Escolher a melhor equipe SOMANDO as duas distâncias
+        Lugar melhorEquipe = null;
+        double menorCaminhoTotal = Double.MAX_VALUE;
+        double distanciaGrafoFinal = 0;
+
+        for (Map.Entry<Lugar, Double> entrada : distanciasPeloGrafo.entrySet()) {
+            Lugar lugarAtual = entrada.getKey();
+            double distPeloGrafo = entrada.getValue();
+
+            if (lugarAtual.getTipo().equalsIgnoreCase(tipoEquipeNecessaria)) {
+                
+                // --- AQUI ESTÁ A LÓGICA QUE VOCÊ PEDIU ---
+                // Total = (Equipe -> Nó da Rua) + (Nó da Rua -> Local Exato do Clique)
+                double total = distPeloGrafo + menorDistanciaDoCliqueAoNo;
+                
+                if (total < menorCaminhoTotal) {
+                    menorCaminhoTotal = total;
+                    melhorEquipe = lugarAtual;
+                    distanciaGrafoFinal = distPeloGrafo;
+                }
+            }
+        }
+
+        // 5. Resultado Detalhado
+        if (melhorEquipe != null) {
+            String msg = String.format("""
+                DESASTRE: %s
+                Ponto de referência mais próximo: %s
+                Distância do clique até a referência: %.2f km
+                
+                EQUIPE ACIONADA: %s
+                Distância da base até a referência (Via Grafo): %.2f km
+                ------------------------------------------------
+                DISTÂNCIA TOTAL ESTIMADA: %.2f km
+                """, 
+                descricao, 
+                noMaisProximo.getNome(), 
+                menorDistanciaDoCliqueAoNo,
+                melhorEquipe.getNome(),
+                distanciaGrafoFinal,
+                menorCaminhoTotal
+            );
+            
+            JOptionPane.showMessageDialog(this, msg);
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Nenhuma equipe de " + tipoEquipeNecessaria + " encontrada!");
+        }
+    }
 }
