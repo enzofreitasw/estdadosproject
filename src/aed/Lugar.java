@@ -28,4 +28,15 @@ class Lugar {
     public String toString() {
         return nome + " (" + tipo + ") [" + coord.getLat() + "," + coord.getLon() + "]";
     }
+    // Adicione este atributo
+    private boolean disponivel = true; // Por padrão, todos começam livres
+
+    // Adicione estes métodos Get e Set
+    public boolean isDisponivel() {
+        return disponivel;
+    }
+
+    public void setDisponivel(boolean disponivel) {
+        this.disponivel = disponivel;
+    }
 }

@@ -82,4 +82,64 @@ public class Grafo {
         }
         return distancias;
     }
+    // ... (Mantenha o resto da classe igual) ...
+
+    /**
+     * Retorna a LISTA ORDENADA de lugares formando o menor caminho.
+     * Ex: [Hospital, Praça, Rodoviária, Depósito]
+     */
+    public List<Lugar> obterMenorCaminho(Lugar origem, Lugar destino) {
+        Map<Lugar, Double> distancias = new HashMap<>();
+        Map<Lugar, Lugar> antecessores = new HashMap<>(); // Para reconstruir o caminho
+        PriorityQueue<Lugar> filaPrioridade = new PriorityQueue<>(Comparator.comparingDouble(distancias::get));
+        Set<Lugar> visitados = new HashSet<>();
+
+        // Inicialização
+        for (Lugar l : adjacencias.keySet()) {
+            distancias.put(l, Double.MAX_VALUE);
+        }
+        distancias.put(origem, 0.0);
+        filaPrioridade.add(origem);
+
+        while (!filaPrioridade.isEmpty()) {
+            Lugar atual = filaPrioridade.poll();
+
+            if (atual.equals(destino)) break; // Chegou onde queria, pode parar (otimização)
+            
+            if (visitados.contains(atual)) continue;
+            visitados.add(atual);
+
+            if (adjacencias.containsKey(atual)) {
+                for (Aresta aresta : adjacencias.get(atual)) {
+                    Lugar vizinho = aresta.getDestino();
+                    if (!visitados.contains(vizinho)) {
+                        double novaDistancia = distancias.get(atual) + aresta.getPeso();
+                        if (novaDistancia < distancias.get(vizinho)) {
+                            distancias.put(vizinho, novaDistancia);
+                            antecessores.put(vizinho, atual); // Guarda: "Para chegar no vizinho, vim do atual"
+                            
+                            filaPrioridade.remove(vizinho);
+                            filaPrioridade.add(vizinho);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Reconstrução do Caminho (De trás para frente)
+        List<Lugar> caminho = new LinkedList<>();
+        Lugar passo = destino;
+        
+        // Se não tem caminho ou destino inalcançável
+        if (distancias.get(destino) == Double.MAX_VALUE) {
+            return caminho; // Retorna vazio
+        }
+
+        while (passo != null) {
+            caminho.add(0, passo); // Adiciona no início da lista
+            passo = antecessores.get(passo);
+        }
+        
+        return caminho;
+    }
 }
