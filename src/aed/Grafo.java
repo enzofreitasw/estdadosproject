@@ -11,7 +11,7 @@ package aed;
 import java.util.*;
 
 public class Grafo {
-    // Mapeia um Lugar para uma lista de arestas (vizinhos)
+    
     private Map<Lugar, List<Aresta>> adjacencias;
 
     public Grafo() {
@@ -82,19 +82,14 @@ public class Grafo {
         }
         return distancias;
     }
-    // ... (Mantenha o resto da classe igual) ...
 
-    /**
-     * Retorna a LISTA ORDENADA de lugares formando o menor caminho.
-     * Ex: [Hospital, Praça, Rodoviária, Depósito]
-     */
+    
     public List<Lugar> obterMenorCaminho(Lugar origem, Lugar destino) {
         Map<Lugar, Double> distancias = new HashMap<>();
         Map<Lugar, Lugar> antecessores = new HashMap<>(); // Para reconstruir o caminho
         PriorityQueue<Lugar> filaPrioridade = new PriorityQueue<>(Comparator.comparingDouble(distancias::get));
         Set<Lugar> visitados = new HashSet<>();
 
-        // Inicialização
         for (Lugar l : adjacencias.keySet()) {
             distancias.put(l, Double.MAX_VALUE);
         }
@@ -104,7 +99,7 @@ public class Grafo {
         while (!filaPrioridade.isEmpty()) {
             Lugar atual = filaPrioridade.poll();
 
-            if (atual.equals(destino)) break; // Chegou onde queria, pode parar (otimização)
+            if (atual.equals(destino)) break; 
             
             if (visitados.contains(atual)) continue;
             visitados.add(atual);
@@ -126,17 +121,15 @@ public class Grafo {
             }
         }
 
-        // Reconstrução do Caminho (De trás para frente)
         List<Lugar> caminho = new LinkedList<>();
         Lugar passo = destino;
         
-        // Se não tem caminho ou destino inalcançável
         if (distancias.get(destino) == Double.MAX_VALUE) {
-            return caminho; // Retorna vazio
+            return caminho; 
         }
 
         while (passo != null) {
-            caminho.add(0, passo); // Adiciona no início da lista
+            caminho.add(0, passo); 
             passo = antecessores.get(passo);
         }
         

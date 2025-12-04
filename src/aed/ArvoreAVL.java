@@ -7,7 +7,6 @@ package aed;
 public class ArvoreAVL {
     private NodoAVL raiz;
 
-    // --- MÉTODOS PÚBLICOS (INTERFACE SIMPLES) ---
     
     public void inserir(Lugar equipe) {
         raiz = inserirNo(raiz, equipe);

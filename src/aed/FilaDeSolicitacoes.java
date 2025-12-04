@@ -85,7 +85,7 @@ public class FilaDeSolicitacoes {
             primeiro = primeiro.posterior;
         }
         
-        // Limpa a referência do removido (boa prática)
+        // Limpa a referência do removido 
         removido.posterior = null;
         
         totalDeSolicitacoes--;

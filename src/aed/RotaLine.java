@@ -7,10 +7,7 @@ import java.awt.Graphics2D;
 import java.awt.Point;
 import java.util.List;
 
-/**
- * Classe personalizada para desenhar rotas sem fechar o triângulo.
- * Herda de MapPolygonImpl (que sabemos que existe), mas muda o jeito de pintar.
- */
+
 public class RotaLine extends MapPolygonImpl {
 
     public RotaLine(List<Coordinate> points) {
@@ -32,8 +29,7 @@ public class RotaLine extends MapPolygonImpl {
             y[i] = points.get(i).y;
         }
 
-        // A MÁGICA ESTÁ AQUI:
-        // Usamos drawPolyline (linha aberta) em vez de drawPolygon (forma fechada)
+        // Usamos drawPolyline (linha aberta) 
         if (points.size() > 0) {
             g2.drawPolyline(x, y, points.size());
         }

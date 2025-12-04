@@ -28,12 +28,12 @@ public class TelaAED extends javax.swing.JFrame {
     private List<Rota> rotas = new ArrayList<>();
     private boolean modoSelecaoDesastre = false; 
     private String tipoDesastreAtual = "";
-    private Grafo grafoCidade = new Grafo(); // Seu objeto Grafo
     private HashCentroRecursos hashRecursos = new HashCentroRecursos(); 
     private ArvoreAVL arvoreEquipes = new ArvoreAVL();
-    
     private FilaDeSolicitacoes filaEmergencia = new FilaDeSolicitacoes();
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(TelaAED.class.getName());
+    
+    private Grafo grafoCidade = new Grafo(); 
 
     /**
      * Creates new form TelaAED
@@ -68,7 +68,7 @@ public class TelaAED extends javax.swing.JFrame {
         carregarLugaresIniciais();
         gerarCentrosRecursosAleatorios();
         
-        testeVisualizacaoAVL();
+        //testeVisualizacaoAVL();
     }
 
     /**
@@ -210,10 +210,11 @@ public class TelaAED extends javax.swing.JFrame {
 
         // Marcador no mapa
         map.addMapMarker(new MapMarkerDot(nome, coord));
-
+        grafoCidade.adicionarLugar(lugar);
         JOptionPane.showMessageDialog(this,
                 "Lugar cadastrado:\n" + lugar);
     }
+    
     private void cadastrarRota() {
         if (lugares.size() < 2) {
             JOptionPane.showMessageDialog(this,
@@ -253,10 +254,11 @@ public class TelaAED extends javax.swing.JFrame {
         coords.add(origem.getCoord());
         coords.add(destino.getCoord());
         map.addMapPolygon(new MapPolygonImpl(coords));
-
+        grafoCidade.adicionarRota(origem, destino, distancia);
         JOptionPane.showMessageDialog(this,
                 "Rota cadastrada:\n" + rota);
     }
+    
     private double calcularDistancia(Coordinate c1, Coordinate c2) {
         final double R = 6371.0; // raio da Terra em km
         double lat1 = Math.toRadians(c1.getLat());
@@ -275,13 +277,12 @@ public class TelaAED extends javax.swing.JFrame {
 
         return R * c;
     }
+    
     private void carregarLugaresIniciais() {
         // --- COORDENADAS DE CRUZ DAS ALMAS, BA ---
         
         // 1. Equipes (Bases)
-        // Local fictício próximo à saída para BR-101
         Lugar baseBombeiros = new Lugar("Bombeiros (BR-101)", "Bombeiros", new Coordinate(-12.6645, -39.1130));
-        // Próximo ao centro
         Lugar baseHospital = new Lugar("Hospital (Centro)", "Médicos", new Coordinate(-12.6738, -39.1070)); 
         
         // 2. Pontos de Passagem (Malha Viária da cidade)
@@ -299,7 +300,6 @@ public class TelaAED extends javax.swing.JFrame {
         adicionarLugarNoSistema(rodoviaria);
 
         // --- CONEXÕES REAIS ---
-        // Agora não passamos o peso manual. O método calculará a distância em KM.
         
         // Conexões do Hospital
         criarConexao(baseHospital, pracaMatriz);
@@ -313,6 +313,8 @@ public class TelaAED extends javax.swing.JFrame {
         // Conexões da UFRB
         criarConexao(ufrb, pracaMatriz);
         criarConexao(ufrb, baseBombeiros); // Via perimetral fictícia
+        
+        // Arvore
         arvoreEquipes.inserir(baseBombeiros);
         arvoreEquipes.inserir(baseHospital);
         arvoreEquipes.imprimirDisponiveis();
@@ -320,138 +322,33 @@ public class TelaAED extends javax.swing.JFrame {
         logger.info("Mapa de Cruz das Almas carregado.");
     }
 
-    // --- Métodos Auxiliares para evitar repetição de código ---
 
     private void adicionarLugarNoSistema(Lugar l) {
-        lugares.add(l); // Lista local
-        map.addMapMarker(new MapMarkerDot(l.getNome(), l.getCoord())); // Visual
-        grafoCidade.adicionarLugar(l); // Grafo Lógico (Dijkstra)
+        lugares.add(l); 
+        map.addMapMarker(new MapMarkerDot(l.getNome(), l.getCoord())); 
+        grafoCidade.adicionarLugar(l); 
     }
 
     private void criarConexao(Lugar origem, Lugar destino) {
-        // Calcula a distância real em KM para usar como PESO da aresta
-        double distanciaReal = calcularDistancia(origem.getCoord(), destino.getCoord());
-        
-        // Conecta no Grafo Lógico
+        double distanciaReal = calcularDistancia(origem.getCoord(), destino.getCoord());       
         grafoCidade.adicionarRota(origem, destino, distanciaReal);
-
-        // Desenha a linha no Mapa Visual
         List<Coordinate> linha = new ArrayList<>();
         linha.add(origem.getCoord());
         linha.add(destino.getCoord());
         map.addMapPolygon(new MapPolygonImpl(linha));
     }
     
-    private void processarDesastre(Coordinate coordDesastre, String descricao) {
-        // 1. Identificar tipo de equipe
-        String tipoEquipeNecessaria;
-        if (descricao.equals("Incêndio") || descricao.equals("Resgate")) {
-            tipoEquipeNecessaria = "Bombeiros";
-        } else if (descricao.equals("Acidente de Trânsito")) {
-            tipoEquipeNecessaria = "Médicos";
-        } else {
-            tipoEquipeNecessaria = "Logística"; 
-        }
-           //gitteste02
-        // 2. Achar o nó da malha viária mais próximo do clique
-        Lugar noMaisProximo = null;
-        double menorDistanciaDoCliqueAoNo = Double.MAX_VALUE;
-
-        for (Lugar l : lugares) {
-            double d = calcularDistancia(coordDesastre, l.getCoord());
-            if (d < menorDistanciaDoCliqueAoNo) {
-                menorDistanciaDoCliqueAoNo = d;
-                noMaisProximo = l;
-            }
-        }
-
-        if (noMaisProximo == null) {
-            JOptionPane.showMessageDialog(this, "Erro: O mapa está vazio.");
-            return;
-        }
-
-        // Adiciona marcador do desastre
-        map.addMapMarker(new MapMarkerDot("DESASTRE: " + descricao, coordDesastre));
-
-        // 3. Executar Dijkstra a partir do nó da rua
-        Map<Lugar, Double> distanciasPeloGrafo = grafoCidade.executarDijkstra(noMaisProximo);
-
-        // 4. Escolher a melhor equipe SOMANDO as duas distâncias
-        Lugar melhorEquipe = null;
-        double menorCaminhoTotal = Double.MAX_VALUE;
-        double distanciaGrafoFinal = 0;
-
-        for (Map.Entry<Lugar, Double> entrada : distanciasPeloGrafo.entrySet()) {
-            Lugar lugarAtual = entrada.getKey();
-            double distPeloGrafo = entrada.getValue();
-
-            if (lugarAtual.getTipo().equalsIgnoreCase(tipoEquipeNecessaria)) {
-                
-                // --- AQUI ESTÁ A LÓGICA QUE VOCÊ PEDIU ---
-                // Total = (Equipe -> Nó da Rua) + (Nó da Rua -> Local Exato do Clique)
-                double total = distPeloGrafo + menorDistanciaDoCliqueAoNo;
-                
-                if (total < menorCaminhoTotal) {
-                    menorCaminhoTotal = total;
-                    melhorEquipe = lugarAtual;
-                    distanciaGrafoFinal = distPeloGrafo;
-                }
-            }
-        }
-
-        // 5. Resultado Detalhado
-        if (melhorEquipe != null) {
-            String msg = String.format("""
-                DESASTRE: %s
-                Ponto de referência mais próximo: %s
-                Distância do clique até a referência: %.2f km
-                
-                EQUIPE ACIONADA: %s
-                Distância da base até a referência (Via Grafo): %.2f km
-                ------------------------------------------------
-                DISTÂNCIA TOTAL ESTIMADA: %.2f km
-                """, 
-                descricao, 
-                noMaisProximo.getNome(), 
-                menorDistanciaDoCliqueAoNo,
-                melhorEquipe.getNome(),
-                distanciaGrafoFinal,
-                menorCaminhoTotal
-            );
-            
-            JOptionPane.showMessageDialog(this, msg);
-        } else {
-            JOptionPane.showMessageDialog(this, 
-                "Nenhuma equipe de " + tipoEquipeNecessaria + " encontrada!");
-        }
-    }
-    
-    // -------------------------------------------------------------------------
-    // MÉTODOS DE INTEGRAÇÃO (FILA + GRAFO)
-    // Copie e cole isso no corpo da classe TelaAED, fora de outros métodos
-    // -------------------------------------------------------------------------
-
-    // 1. Método que processa a lógica de atendimento
     private void atenderProximaSolicitacao() {
-        // Verifica se a fila existe e tem gente
         if (filaEmergencia == null || filaEmergencia.totalDeSolicitacoes == 0) {
             JOptionPane.showMessageDialog(this, "Não há chamados pendentes. Bom trabalho!");
             return;
         }
-
-        // Pega o primeiro da fila (sem remover ainda, pra podermos ler os dados)
-        // O código do seu amigo usa 'primeiro' como público ou package-private
         if (filaEmergencia.primeiro == null) return;
-        
-        Solicitacao sol = filaEmergencia.primeiro.solicitacao; // Pega o dado
-        filaEmergencia.atenderSolicitacao(); // Remove da fila e printa no console
-
-        // AGORA RODAMOS O SEU DIJKSTRA PARA ESSA SOLICITAÇÃO
+        Solicitacao sol = filaEmergencia.primeiro.solicitacao; 
+        filaEmergencia.atenderSolicitacao(); 
         processarAtendimento(sol);
     }
 
-    // 2. Método que adiciona na fila (será chamado pelo clique do mapa)
-    // 2. Método que adiciona na fila (será chamado pelo clique do mapa)
     private void adicionarNaFila(Coordinate coord, String tipo) {
         String[] graus = {"1 - Baixo", "2 - Médio", "3 - Alto", "4 - CRÍTICO"};
         String grauStr = (String) JOptionPane.showInputDialog(
@@ -461,53 +358,40 @@ public class TelaAED extends javax.swing.JFrame {
         if (grauStr == null) return; // Cancelou
 
         int grau = Integer.parseInt(grauStr.substring(0, 1)); 
-        // 2. Pede Recurso Necessário [NOVO]
-        String[] recs = Recurso.tipos; // {"Água", "Alimentos"...}
+        String[] recs = Recurso.tipos; 
         String recStr = (String) JOptionPane.showInputDialog(this, "Qual recurso prioritário?", "Logística", JOptionPane.QUESTION_MESSAGE, null, recs, recs[3]);
         if (recStr == null) return;
         
-        // Descobre o índice (1 a 6) baseado na string
         int tipoRecurso = 1;
         for(int i=0; i<recs.length; i++) { if(recs[i].equals(recStr)) tipoRecurso = i+1; }
-        // Cria ID único
         java.util.UUID id = java.util.UUID.randomUUID();
         
-        // Cria a solicitação 
         Solicitacao novaSolicitacao = new Solicitacao(id, coord, tipo, grau, tipoRecurso);
         
-        // Insere na Fila 
         filaEmergencia.CadastrarSolicitacao(novaSolicitacao);
 
-        // --- CORREÇÃO DO ERRO DA IMAGEM ---
-        // 1. Criamos o marcador com Nome e Coordenada
         MapMarkerDot marker = new MapMarkerDot("PENDENTE (" + grau + ")", coord);
-        // 2. Mudamos a cor para Vermelho explicitamente
         marker.setBackColor(Color.RED);
-        // 3. Adicionamos ao mapa
         map.addMapMarker(marker);
         marcadoresAtivos.put(id, marker);
         JOptionPane.showMessageDialog(this, "Solicitação registrada na fila de prioridade!");
     }
 
-    // 3. Seu Dijkstra adaptado para receber o objeto Solicitacao
-    // Substitua o método antigo por este novo
+    
     private void processarAtendimento(Solicitacao sol) {
-        // Remove marcador vermelho (igual antes)
-        MapMarkerDot marcadorVermelho = marcadoresAtivos.remove(sol.getID());
-        if (marcadorVermelho != null) map.removeMapMarker(marcadorVermelho);
+        
+        
 
         Coordinate coordDesastre = sol.getCoordenadas();
         String descricao = sol.getTipoDeEmergencia();
         int recursoNecessario = sol.getTipoRecursoNecessario();
 
-        // 1. Busca recurso (igual antes)
         CentroRecursos centroRecurso = hashRecursos.buscarRecursoProximo(coordDesastre, recursoNecessario);
         if (centroRecurso == null) {
             JOptionPane.showMessageDialog(this, "Sem estoque de " + Recurso.tipos[recursoNecessario-1]);
             return;
         }
 
-        // 2. Define Equipe (igual antes)
         String tipoEquipeNecessaria;
         if (descricao.equals("Incêndio") || descricao.equals("Resgate") || descricao.equals("Inundação")) {
             tipoEquipeNecessaria = "Bombeiros";
@@ -517,7 +401,6 @@ public class TelaAED extends javax.swing.JFrame {
             tipoEquipeNecessaria = "Logística"; 
         }
 
-        // 3. Achar nó mais próximo do desastre (para finalizar a rota)
         Lugar noMaisProximoDesastre = null;
         double menorDistDesastre = Double.MAX_VALUE;
         for (Lugar l : lugares) {
@@ -525,7 +408,6 @@ public class TelaAED extends javax.swing.JFrame {
             if (d < menorDistDesastre) { menorDistDesastre = d; noMaisProximoDesastre = l; }
         }
 
-        // 4. Dijkstra para escolher a equipe mais próxima do CENTRO
         Map<Lugar, Double> distanciasDoCentro = grafoCidade.executarDijkstra(centroRecurso);
         
         Lugar melhorEquipe = null;
@@ -544,36 +426,30 @@ public class TelaAED extends javax.swing.JFrame {
         if (melhorEquipe != null) {
             melhorEquipe.setDisponivel(false);
             
-            // --- INTEGRAÇÃO AVL: REMOVE A EQUIPE DA ÁRVORE ---
             arvoreEquipes.remover(melhorEquipe.getNome());
             System.out.println("Equipe removida da AVL: " + melhorEquipe.getNome());
             arvoreEquipes.imprimirDisponiveis(); // Prova visual no console
-            // -------------------------------------------------
             
-            // --- AQUI ESTÁ A MÁGICA DA ROTA REAL ---
             
-            // Perna 1: Base -> Centro (Pega todos os n´s da rua)
+            // Base -> Centro (Pega todos os n´s da rua)
             List<Lugar> caminho1 = grafoCidade.obterMenorCaminho(melhorEquipe, centroRecurso);
             
-            // Perna 2: Centro -> Nó perto do Desastre
+            // Centro -> Nó perto do Desastre
             List<Lugar> caminho2 = grafoCidade.obterMenorCaminho(centroRecurso, noMaisProximoDesastre);
 
-            // Junta tudo numa lista de coordenadas visuais
             List<Coordinate> rotaVisual = new ArrayList<>();
             
-            // Adiciona Perna 1
+            
             for(Lugar l : caminho1) rotaVisual.add(l.getCoord());
             
-            // Adiciona Perna 2 (Evita duplicar o centro se ele for o fim da 1 e inicio da 2)
+            
             for(Lugar l : caminho2) {
                 if(!rotaVisual.contains(l.getCoord())) rotaVisual.add(l.getCoord());
             }
             
-            // Adiciona o ponto final exato (clique)
             rotaVisual.add(coordDesastre);
             RotaLine desenhoRota = new RotaLine(rotaVisual);
             
-            // Opcional: Definir cor e espessura da linha
             desenhoRota.setColor(Color.BLUE); 
             desenhoRota.setStroke(new java.awt.BasicStroke(3));
             map.addMapPolygon(desenhoRota); 
@@ -581,19 +457,16 @@ public class TelaAED extends javax.swing.JFrame {
             String msg = "Equipe " + melhorEquipe.getNome() + " em deslocamento!\nRota real calculada.";
             JOptionPane.showMessageDialog(this, msg);
 
-            // Timer para limpar
             final Lugar eq = melhorEquipe;
             new javax.swing.Timer(10000, e -> {
                 eq.setDisponivel(true);
-                
-                // --- INTEGRAÇÃO AVL: DEVOLVE A EQUIPE PRA ÁRVORE ---
                 arvoreEquipes.inserir(eq);
                 System.out.println("Equipe retornou para AVL: " + eq.getNome());
-                arvoreEquipes.imprimirDisponiveis();
-                // ---------------------------------------------------
-                
+                arvoreEquipes.imprimirDisponiveis();                
                 map.removeMapPolygon(desenhoRota);
                 ((javax.swing.Timer)e.getSource()).stop();
+                MapMarkerDot marcadorVermelho = marcadoresAtivos.remove(sol.getID());
+                if (marcadorVermelho != null) map.removeMapMarker(marcadorVermelho);
             }).start();
 
         } else {
@@ -601,15 +474,9 @@ public class TelaAED extends javax.swing.JFrame {
         }
     }
     
-    // -----------------------------------------------------------
-    // NOVO MÉTODO: GERA CENTROS EM CRUZ DAS ALMAS
-    // -----------------------------------------------------------
-    // -----------------------------------------------------------
-    // GERA CENTROS E CONECTA ELES À MALHA VIÁRIA (CORRIGIDO)
-    // -----------------------------------------------------------
     private void gerarCentrosRecursosAleatorios() {
         Random rand = new Random();
-        // Limites aproximados de Cruz das Almas
+        
         double minLon = -39.1250; double maxLon = -39.0850;
         double minLat = -12.6750; double maxLat = -12.6550;
 
@@ -620,22 +487,18 @@ public class TelaAED extends javax.swing.JFrame {
             
             CentroRecursos centro = new CentroRecursos("Depósito " + (k+1), c);
             
-            // Add Recursos
             centro.addRecurso(1, rand.nextInt(50)); 
             centro.addRecurso(2, rand.nextInt(50)); 
             centro.addRecurso(3, rand.nextInt(50)); 
             centro.addRecurso(4, rand.nextInt(50)); 
             
-            // Visual
             MapMarkerDot markerCentro = new MapMarkerDot("Recursos " + (k+1), c);
             markerCentro.setBackColor(Color.BLUE); 
             map.addMapMarker(markerCentro);
             
-            // --- CORREÇÃO: LIGAR O DEPÓSITO À RUA MAIS PRÓXIMA ---
             Lugar pontoConexao = null;
             double menorDistancia = Double.MAX_VALUE;
             
-            // Varre todos os lugares que já existem para achar o vizinho mais próximo
             for(Lugar existente : lugares) {
                 double d = calcularDistancia(c, existente.getCoord());
                 if(d < menorDistancia){
@@ -644,14 +507,11 @@ public class TelaAED extends javax.swing.JFrame {
                 }
             }
             
-            // Adiciona ao sistema
             lugares.add(centro);
             grafoCidade.adicionarLugar(centro); 
             hashRecursos.addCentroRec(centro); 
             
-            // SE achou um vizinho (sempre vai achar), cria a rua (Aresta)
             if (pontoConexao != null) {
-                // Isso cria a aresta no Grafo e desenha a linha preta no mapa
                 criarConexao(centro, pontoConexao); 
             }
             // ------------------------------------------------------

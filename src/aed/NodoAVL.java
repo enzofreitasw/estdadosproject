@@ -5,7 +5,7 @@
 package aed;
 
 public class NodoAVL {
-    Lugar equipe;      // O dado armazenado
+    Lugar equipe;      
     NodoAVL esquerda;
     NodoAVL direita;
     int altura;
