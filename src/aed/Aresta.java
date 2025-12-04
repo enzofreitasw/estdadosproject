@@ -8,10 +8,9 @@ package aed;
  *
  * @author enzof
  */
-// Representa uma conexão entre dois lugares no Grafo
 public class Aresta {
     private Lugar destino;
-    private double peso; // Distância ou Tempo
+    private double peso; 
 
     public Aresta(Lugar destino, double peso) {
         this.destino = destino;

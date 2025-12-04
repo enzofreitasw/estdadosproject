@@ -3,7 +3,7 @@
  * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JFrame.java to edit this template
  */
 package aed;
-//teste03
+
 import org.openstreetmap.gui.jmapviewer.Coordinate;
 import org.openstreetmap.gui.jmapviewer.JMapViewer;
 import org.openstreetmap.gui.jmapviewer.MapMarkerDot;
@@ -14,22 +14,23 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.*; // Importa Map, List, ArrayList, Set, HashMap, etc.
+import java.util.*; 
 
 /**
  *
  * @author enzof
  */
 public class TelaAED extends javax.swing.JFrame {
+    
     private Map<java.util.UUID, MapMarkerDot> marcadoresAtivos = new HashMap<>();
     private JMapViewer map;
     private List<Lugar> lugares = new ArrayList<>();
     private List<Rota> rotas = new ArrayList<>();
-    // Adicione logo abaixo de: private List<Rota> rotas...
     private boolean modoSelecaoDesastre = false; 
     private String tipoDesastreAtual = "";
     private Grafo grafoCidade = new Grafo(); // Seu objeto Grafo
-    private HashCentroRecursos hashRecursos = new HashCentroRecursos(); // Instancia o Hash
+    private HashCentroRecursos hashRecursos = new HashCentroRecursos(); 
+    private ArvoreAVL arvoreEquipes = new ArvoreAVL();
     
     private FilaDeSolicitacoes filaEmergencia = new FilaDeSolicitacoes();
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(TelaAED.class.getName());
@@ -38,11 +39,12 @@ public class TelaAED extends javax.swing.JFrame {
      * Creates new form TelaAED
      */
     public TelaAED() {
+        
         initComponents();
         map = new JMapViewer();
         map.setZoom(5);
-        map.setDisplayPosition(new Coordinate(-12.6710, -39.1005), 14); // Zoom 14 para ver as ruas 
-        // 2. Adiciona os listeners
+        map.setDisplayPosition(new Coordinate(-12.6710, -39.1005), 14); 
+        
         map.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -50,12 +52,10 @@ public class TelaAED extends javax.swing.JFrame {
                     Point p = e.getPoint();
                     Coordinate coord = (Coordinate) map.getPosition(p);
                     
-                    if (modoSelecaoDesastre) {
-                        // Se clicou para marcar desastre
+                    if (modoSelecaoDesastre) {                     
                         adicionarNaFila(coord, tipoDesastreAtual);
                         modoSelecaoDesastre = false; // Reseta o modo
                     } else {
-                        // Se clicou para cadastrar um lugar novo (comportamento antigo)
                         cadastrarLugar(coord); 
                     } 
                 }
@@ -63,12 +63,12 @@ public class TelaAED extends javax.swing.JFrame {
             
         });
 
-        // 3. ADICIONA O MAPA NO PAINEL DO DESIGN
-        // (panelMapa foi o nome que você deu ao JPanel no modo Design)
         panelMapa.setLayout(new BorderLayout());
         panelMapa.add(map, BorderLayout.CENTER);
         carregarLugaresIniciais();
         gerarCentrosRecursosAleatorios();
+        
+        testeVisualizacaoAVL();
     }
 
     /**
@@ -136,11 +136,11 @@ public class TelaAED extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        cadastrarRota();        // TODO add your handling code here:
+        cadastrarRota();        
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
-        // 1. Pergunta a descrição/tipo do desastre
+        
         String[] opcoes = {"Incêndio", "Acidente de Trânsito", "Resgate", "Outros"};
         String escolha = (String) JOptionPane.showInputDialog(
                 this, "Qual o tipo da ocorrência?", "Reportar Desastre",
@@ -148,7 +148,7 @@ public class TelaAED extends javax.swing.JFrame {
 
         if (escolha != null) {
             this.tipoDesastreAtual = escolha;
-            this.modoSelecaoDesastre = true; // Ativa o modo de espera pelo clique
+            this.modoSelecaoDesastre = true; 
             JOptionPane.showMessageDialog(this, 
                 "Agora CLIQUE no mapa onde ocorreu o desastre (" + escolha + ").");
         }
@@ -189,6 +189,8 @@ public class TelaAED extends javax.swing.JFrame {
     private javax.swing.JButton jButton3;
     private javax.swing.JPanel panelMapa;
     // End of variables declaration//GEN-END:variables
+    
+    
     private void cadastrarLugar(Coordinate coord) {
         String nome = JOptionPane.showInputDialog(this, "Nome do lugar:");
         if (nome == null || nome.isEmpty()) return;
@@ -311,7 +313,10 @@ public class TelaAED extends javax.swing.JFrame {
         // Conexões da UFRB
         criarConexao(ufrb, pracaMatriz);
         criarConexao(ufrb, baseBombeiros); // Via perimetral fictícia
-
+        arvoreEquipes.inserir(baseBombeiros);
+        arvoreEquipes.inserir(baseHospital);
+        arvoreEquipes.imprimirDisponiveis();
+        
         logger.info("Mapa de Cruz das Almas carregado.");
     }
 
@@ -538,7 +543,13 @@ public class TelaAED extends javax.swing.JFrame {
 
         if (melhorEquipe != null) {
             melhorEquipe.setDisponivel(false);
-
+            
+            // --- INTEGRAÇÃO AVL: REMOVE A EQUIPE DA ÁRVORE ---
+            arvoreEquipes.remover(melhorEquipe.getNome());
+            System.out.println("Equipe removida da AVL: " + melhorEquipe.getNome());
+            arvoreEquipes.imprimirDisponiveis(); // Prova visual no console
+            // -------------------------------------------------
+            
             // --- AQUI ESTÁ A MÁGICA DA ROTA REAL ---
             
             // Perna 1: Base -> Centro (Pega todos os n´s da rua)
@@ -572,8 +583,15 @@ public class TelaAED extends javax.swing.JFrame {
 
             // Timer para limpar
             final Lugar eq = melhorEquipe;
-            new javax.swing.Timer(5000, e -> {
+            new javax.swing.Timer(10000, e -> {
                 eq.setDisponivel(true);
+                
+                // --- INTEGRAÇÃO AVL: DEVOLVE A EQUIPE PRA ÁRVORE ---
+                arvoreEquipes.inserir(eq);
+                System.out.println("Equipe retornou para AVL: " + eq.getNome());
+                arvoreEquipes.imprimirDisponiveis();
+                // ---------------------------------------------------
+                
                 map.removeMapPolygon(desenhoRota);
                 ((javax.swing.Timer)e.getSource()).stop();
             }).start();
@@ -639,4 +657,27 @@ public class TelaAED extends javax.swing.JFrame {
             // ------------------------------------------------------
         }
     }
+    
+    private void testeVisualizacaoAVL() {
+        System.out.println(">>> INICIANDO TESTE DE CARGA DA AVL <<<");
+        
+        // Criando equipes fictícias apenas para encher a árvore
+        // Note que vou inserir fora de ordem alfabética para forçar a árvore a trabalhar
+        String[] nomes = {
+            "Bravo (Polícia)", "Alpha (Médicos)", "Charlie (Bombeiros)", 
+            "Delta (Logística)", "Echo (Resgate)", "Foxtrot (Polícia)", 
+            "Golf (Médicos)", "Hotel (Bombeiros)", "India (Logística)", 
+            "Juliet (Resgate)"
+        };
+
+        for (String nome : nomes) {
+            // Cria um lugar temporário só pra guardar na árvore
+            Lugar l = new Lugar(nome, "Teste", new Coordinate(0,0));
+            arvoreEquipes.inserir(l);
+        }
+
+        // Agora imprime a estrutura real
+        arvoreEquipes.imprimirArvoreVisual();
+    }
+    
 }
